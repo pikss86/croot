@@ -7,12 +7,6 @@ from aiohttp import web
 HOST = '0.0.0.0'
 PORT = os.getenv("PORT", 8080)
 
-# TODO:
-# CREATE (POST)
-# 1. Разделить путь на путь в файловой системе и путь внутри файла
-# 2. Выяснить к чему ведет путь в фаловой системе, к файлу или к папке
-# 3. В зависимости от типа объекта фаловой системы (dir, txt, json, xml) определить объект внутри файла
-
 
 async def create(request):
     path = request.match_info.get('path', "")
@@ -78,12 +72,13 @@ async def read(request):
     pathinfile = []
 
     for pathseg in path.split("/"):
-        if not os.path.exists(filename):
-            return web.Response(text="", status=404)
-        if not os.path.isfile(filename):
-            filename = os.path.join(filename, pathseg)
-        else:
+        if os.path.isfile(filename):
             pathinfile.append(pathseg)
+        if os.path.isdir(filename):
+            if os.path.exists(os.path.join(filename, pathseg)):
+                filename = os.path.join(filename, pathseg)
+            else:
+                return web.Response(text="", status=404)
 
     if os.path.isdir(filename):
         listdir = os.listdir(filename)
@@ -94,14 +89,14 @@ async def read(request):
         else:
             return web.Response(text='\n'.join(listdir), status=200)
 
-    if len(pathinfile) > 0:
+    if os.path.isfile(filename):
         fn = filename.split(os.path.sep)[-1]
         fn = fn.split('.')
 
         if len(fn) > 1:
             ext = fn[-1]
 
-            if ext == 'json':
+            if ext == 'json' and len(pathinfile) > 0:
                 with open(filename, 'rb') as f:
                     obj = json.load(f)
                     for key in pathinfile:
@@ -128,7 +123,7 @@ async def read(request):
                     else:
                         return web.Response(text=os.linesep.join(childlist), status=200)
 
-            if ext == 'xml':
+            if ext == 'xml' and len(pathinfile) > 0:
                 doc = lxml.etree.parse(filename)
                 #root = tree.getroot()
                 xpath = '/' + '/'.join(pathinfile)
@@ -136,36 +131,39 @@ async def read(request):
                 print(elements)
                 return web.Response(text=xpath, status=200)
 
-            if ext == 'txt':
+            if ext == 'txt' and len(pathinfile) == 1:
                 with open(filename, 'r') as f:
-                    s = f.readlines()[int(pathinfile[0])]
+                    s = f.readlines()[int(pathinfile[0])]                                                   
                     return web.Response(text=s, status=200)
 
-    if headers['Accept'] == 'application/json':
-        fn = filename.split(os.path.sep)[-1]
-        fn = fn.split('.')
+            if ext == 'txt' and len(pathinfile) == 0:
+                if headers['Accept'] == 'application/json':
+                    fn = filename.split(os.path.sep)[-1]
+                    fn = fn.split('.')
 
-        if len(fn) > 1:
-            ext = fn[-1]
+                    if len(fn) > 1:
+                        ext = fn[-1]
 
-            if ext == 'txt':
-                with open(filename, 'r') as f:
-                    content = f.read()
-                    lines = content.split(os.linesep)
-                    return web.Response(text=json.dumps(lines), status=200,
-                                            headers={'Content-Type': 'application/json'})
+                        if ext == 'txt':
+                            with open(filename, 'r') as f:
+                                content = f.read()
+                                lines = content.split(os.linesep)
+                                return web.Response(text=json.dumps(lines), status=200,
+                                                        headers={'Content-Type': 'application/json'})
 
+        if len(pathinfile) == 0:
+            with open(filename, 'rb') as f:
+                content = f.read()
+                # headers = dict()
+                # if '.html' in filename:
+                #     headers = {'Content-Type': "text/html; charset=utf-8"}
+                # if '.css' in filename:
+                #     headers = {'Content-Type': "text/css"}
+                # if '.js' in filename:
+                #     headers = {'Content-Type': "text/javascript"}
+                return web.Response(body=content)  # , headers=headers)
 
-    with open(filename, 'rb') as f:
-        content = f.read()
-        # headers = dict()
-        # if '.html' in filename:
-        #     headers = {'Content-Type': "text/html; charset=utf-8"}
-        # if '.css' in filename:
-        #     headers = {'Content-Type': "text/css"}
-        # if '.js' in filename:
-        #     headers = {'Content-Type': "text/javascript"}
-        return web.Response(body=content)  # , headers=headers)
+        return web.Response(text="", status=404)
 
 
 async def update(request):
