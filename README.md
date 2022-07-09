@@ -1,5 +1,4 @@
-# croot
-CRUD tooling
+Утилита в разработке.
 ```
 npm i croot
 ```
