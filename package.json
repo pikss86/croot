@@ -4,7 +4,7 @@
   "description": "CRUD server",
   "main": "croot.js",
   "scripts": {
-    "test": "jest"
+    "run": "node croot.js"
   },
   "author": "pikss86 (pikss86@gmail.com)",
   "license": "MIT",
@@ -14,9 +14,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/pikss86/croot.git"
-  },
-  "devDependencies": {
-    "jest": "^27.5.1",
-    "memfs": "^3.4.1"
   }
 }
