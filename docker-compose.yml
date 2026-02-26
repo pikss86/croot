@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  croot-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: croot-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - croot-data:/data
+  croot-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: croot-client
+    depends_on:
+      - croot-server
+volumes:
+  croot-data:

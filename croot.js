@@ -327,10 +327,18 @@ No external deps.
 
     function startFsWatch(root) {
       if (!isNode) return function () {};
-      var watcher = fs.watch(root, { recursive: true }, function (eventType, filename) {
-        emitEvent('fs', { event: eventType, path: filename });
-      });
-      return function () { try { watcher.close(); } catch (e) {} };
+      try {
+        var watcher = fs.watch(root, { recursive: true }, function (eventType, filename) {
+          emitEvent('fs', { event: eventType, path: filename });
+        });
+        return function () { try { watcher.close(); } catch (e) {} };
+      } catch (e) {
+        // Fallback: non-recursive watch (platforms without recursive support)
+        var watcher2 = fs.watch(root, function (eventType, filename) {
+          emitEvent('fs', { event: eventType, path: filename });
+        });
+        return function () { try { watcher2.close(); } catch (e2) {} };
+      }
     }
 
     // Minimal WebSocket server (text-only)

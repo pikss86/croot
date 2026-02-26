@@ -1,0 +1,7 @@
+FROM python:3.12-alpine
+WORKDIR /app
+RUN apk add --no-cache curl
+COPY scripts/test_api.py /app/test_api.py
+ENV CROOT_HOST=croot-server
+ENV CROOT_PORT=8080
+CMD ["python", "/app/test_api.py"]
