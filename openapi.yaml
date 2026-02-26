@@ -1,0 +1,469 @@
+openapi: 3.0.3
+info:
+  title: CROOT HTTP API
+  version: "1.0.0"
+  description: API, поднимаемое `node croot.js`
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/fs/file:
+    get:
+      summary: Скачать файл (поддержка Range)
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+          description: Путь к файлу (относительно root)
+        - in: header
+          name: Range
+          schema:
+            type: string
+          required: false
+          description: bytes=START-END
+      responses:
+        "200":
+          description: Полный файл
+          content:
+            application/octet-stream: {}
+        "206":
+          description: Частичный контент
+          headers:
+            Content-Range:
+              schema:
+                type: string
+          content:
+            application/octet-stream: {}
+        "404":
+          description: Файл не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Загрузка файла (поддержка Content-Range)
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: header
+          name: Content-Range
+          schema:
+            type: string
+          required: false
+          description: bytes START-END/TOTAL
+      requestBody:
+        required: true
+        content:
+          application/octet-stream: {}
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Ошибка запроса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка записи
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Удалить файл
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "500":
+          description: Ошибка удаления
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/fs/dir:
+    post:
+      summary: Создать директорию (mkdir -p)
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Удалить директорию (с подтверждением)
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: confirmToken
+          schema:
+            type: string
+          required: false
+          description: Токен подтверждения удаления (60s)
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "409":
+          description: Требуется подтверждение
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: false }
+                  confirmRequired: { type: boolean, example: true }
+                  token: { type: string }
+                  message: { type: string }
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/fs/list:
+    get:
+      summary: Список файлов/директорий
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Список
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FsEntry"
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/fs/tree:
+    get:
+      summary: Полное дерево подпутей
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Дерево
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TreeEntry"
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/fs/read:
+    get:
+      summary: Прочитать часть файла
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          required: false
+          description: Смещение, по умолчанию 0
+        - in: query
+          name: length
+          schema:
+            type: integer
+          required: false
+          description: Длина, по умолчанию 1MB
+      responses:
+        "200":
+          description: Фрагмент файла
+          content:
+            application/octet-stream: {}
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/json/read:
+    get:
+      summary: Прочитать часть JSON по JSON Pointer
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+          description: JSON Pointer, по умолчанию "/"
+      responses:
+        "200":
+          description: Значение
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  value: {}
+        "404":
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/json/write:
+    post:
+      summary: Записать часть JSON по JSON Pointer
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Ошибка указателя
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка записи
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/json/delete:
+    post:
+      summary: Удалить часть JSON по JSON Pointer
+      parameters:
+        - in: query
+          name: path
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка записи
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mem/get:
+    get:
+      summary: Получить значение из памяти по JSON Pointer
+      parameters:
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Значение
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  value: {}
+
+  /api/mem/set:
+    post:
+      summary: Записать значение в память по JSON Pointer
+      parameters:
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Ошибка указателя
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mem/del:
+    post:
+      summary: Удалить значение из памяти по JSON Pointer
+      parameters:
+        - in: query
+          name: ptr
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    OkResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        result: {}
+    ErrorResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: false }
+        error: { type: string }
+    FsEntry:
+      type: object
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [file, dir] }
+        size: { type: integer }
+        mtime: { type: number }
+    TreeEntry:
+      type: object
+      properties:
+        path: { type: string }
+        type: { type: string, enum: [file, dir] }
+        size: { type: integer }
+        mtime: { type: number }
